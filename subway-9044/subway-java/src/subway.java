@@ -4,6 +4,7 @@ import java.io.*;
 import java.util.*;
 
 
+// 站点，保存站点名称和ID
 class Station {
     String stationName;
     Set<Integer> setStationId;
@@ -15,6 +16,7 @@ class Station {
 }
 
 
+// 路径，距离和经过的中转站列表
 class Path {
     int nFDistance;
     Station stationLastStationInPath;
@@ -27,6 +29,7 @@ class Path {
     }
 }
 
+// 地图，负责站点解析和路径计算
 class Map {
     private Vector<String> listSubwayInfo = new Vector<>();
     private String[] arrSubwayStationsData = {
@@ -54,11 +57,12 @@ class Map {
         try {
             reader = new BufferedReader(new FileReader(fSubway));
             String tempString = null;
-            int nLineOfFile = 1;
 
             while ((tempString = reader.readLine()) != null) {
+                if (tempString.startsWith("\uFEFF")) {
+                    tempString = tempString.substring(1, tempString.length());
+                }
                 listSubwayInfo.addElement(tempString);
-                nLineOfFile++;
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -77,9 +81,11 @@ class Map {
 //            System.out.println(strSubwayLine);
 //        }
 
+
         parseSubwayStationsData();
     }
 
+    // 从数组加载数据
     public void loadsubwayArray() {
         for (String strLineInfo: arrSubwayStationsData) {
             listSubwayInfo.addElement(strLineInfo);
@@ -92,10 +98,6 @@ class Map {
 
         parseSubwayStationsData();
     }
-
-
-
-
 
 
     // ----------------------------------------------
@@ -114,8 +116,10 @@ class Map {
             return;
         }
 
-        int nLine = Integer.parseInt(arrLineAndStations[0]);        // 解析地铁线路号
-        // todo: 解析地铁线路错误处理
+        int nLine = getLineNumber(arrLineAndStations[0]);
+        if (nLine == -1) {
+            System.out.println("地铁线路号数据错误" + strSubwayLine);
+        }
 
 
         String[] arrStrStationNames = arrLineAndStations[1].split("，");
@@ -237,26 +241,10 @@ class Map {
         System.out.println(strFormatedPath);
     }
 
-    void printPath(Path path, String strOurFileName) {
+    void printPath(Path path, String strOutFileName) {
         String strFormatedPath = formatPath(path);
-//        String[] arrWriteData =  strFormatedPath.split("\n");
 
-        try {
-            File file = new File(strOurFileName);
-            if (!file.exists()) {
-                file.createNewFile();
-            }
-            FileWriter fileWriter = new FileWriter(file.getName(), false);
-
-//            for (String strPath: arrWriteData) {
-//                fileWriter.write(strPath + "\r\n");
-//            }
-
-            fileWriter.write(strFormatedPath);
-            fileWriter.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        printFile(strFormatedPath, strOutFileName);
     }
 
     String formatPath(Path path) {
@@ -340,9 +328,39 @@ class Map {
     }
 
     // ------------------------------------------------------------------------------------
+    // 获取特定地铁线路数据
+    void printStationsOfLine(int nLineNum, String strOutFile) {
+        StringBuffer strRst = new StringBuffer();
+        strRst.append(String.format("%d号线\r\n", nLineNum));
+
+        for (int i = 1; i < 90; i++) {
+            int nStationId = nLineNum * 1000 + i;
+
+            if (mapStationIdtoStation.containsKey(nStationId)) {
+                strRst.append(mapStationIdtoStation.get(nStationId).stationName + "\r\n");
+            } else {
+                break;
+            }
+        }
+
+        printFile(strRst.toString(), strOutFile);
+    }
+
+
+    // ------------------------------------------------------------------------------------
     // 工具函数
     int getLineNumber(int nStationId) {
         return nStationId / 1000;
+    }
+
+    int getLineNumber(String strLine) {
+        String s = "1";
+
+        if (strLine.length() >= 1) {
+            String strNumber = strLine.substring(0, 1);
+            return Integer.parseInt(strNumber);
+        }
+        return -1;
     }
 
 
@@ -377,6 +395,22 @@ class Map {
         }
         return -1;
     }
+
+    void printFile(String strContent, String strOutFile) {
+        try {
+            File file = new File(strOutFile);
+            if (!file.exists()) {
+                file.createNewFile();
+            }
+            FileWriter fileWriter = new FileWriter(file.getName(), false);
+
+            fileWriter.write(strContent.toString());
+            fileWriter.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    };
+
 
 
     // ---------------------------------------------------------------------------------------------------
@@ -425,8 +459,6 @@ class Map {
         }
 
     }
-
-
 }
 
 
@@ -435,11 +467,11 @@ public class subway {
 
         // -------------------------------------
         // 解析参数
-        String strSubwayFileName = "";
-        int nLineNum = 0;
-        String strOutFileName = "";
-        String strStartStationName = "";
-        String strEndStationName = "";
+        String strSubwayFileName = null;
+        int nLineNum = -1;
+        String strOutFileName = null;
+        String strStartStationName = null;
+        String strEndStationName = null;
 
         for (int n=0; n<args.length; n++) {
             String strArg = args[n];
@@ -453,8 +485,15 @@ public class subway {
                     return;
                 }
             } else if (strArg.equals("-a")) {
-                // todo: 处理地铁线路号
-                nLineNum = 1;
+                n += 1;
+                if (n < args.length) {
+
+                    String strLineNum = args[n];
+                    if (strLineNum.length() >= 1) {
+                        String strNumber = strLineNum.substring(0, 1);
+                        nLineNum = Integer.parseInt(strNumber);
+                    }
+                }
             } else if (strArg.equals("-o")) {
                 n += 1;
                 if (n < args.length) {
@@ -481,11 +520,26 @@ public class subway {
         // ----------------------------------------------------------------
         // 处理地铁地图。
         Map mapSubway = new Map();
-//        mapSubway.loadSubwayFile(strSubwayFileName);
-        mapSubway.loadsubwayArray();
-        // Path shortedPath = mapSubway.shortedPath(strStartStationName, strEndStationName);
-        Path shortedPath = mapSubway.shortedPath("鞍山道", "远洋国际中心");
-        mapSubway.printPath(shortedPath, strOutFileName);
+
+        if (strSubwayFileName != null) {
+            mapSubway.loadSubwayFile(strSubwayFileName);
+        } else {
+            mapSubway.loadsubwayArray();
+        }
+
+        if (nLineNum != -1) {
+            if (strOutFileName == null) {
+                System.out.println("-o 参数错误");
+            }
+            mapSubway.printStationsOfLine(nLineNum, strOutFileName);
+        } else if (strStartStationName != null) {
+            if (strEndStationName == null || strOutFileName == null) {
+                System.out.println("-b 或 -o 参数错误");
+            }
+
+            Path shortedPath = mapSubway.shortedPath(strStartStationName, strEndStationName);
+            mapSubway.printPath(shortedPath, strOutFileName);
+        }
     }
 }
 

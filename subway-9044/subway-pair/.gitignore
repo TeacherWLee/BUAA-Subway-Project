@@ -1,0 +1,12 @@
+.vs
+*/Debug
+*/Release
+*/x64
+x64
+Debug
+Release
+bin/
+.gitlab-ci.yml
+subway-java.iml
+doc/
+.idea/
